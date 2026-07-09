@@ -1,36 +1,24 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Opspring
 
-## Getting Started
+An AI-powered operating system for businesses — CRM, HRMS, Operations, Finance, and more, in one platform. This repo is starting from its foundation: multi-tenant auth and RBAC. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the tenant model and security design.
 
-First, run the development server:
+## Stack
+
+Next.js (App Router) + Supabase (Postgres, Auth, RLS) + Tailwind + shadcn/ui, on Vercel.
+
+## Getting started
+
+1. Copy the Supabase URL/anon key already in `.env.local` (git-ignored) — they point at the live `opspring` project.
+2. Fill in `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` from the [dashboard's API settings](https://supabase.com/dashboard/project/obmqaofldohremylkitt/settings/api). It's server-only, never shipped to the client, and only needed for admin/background scripts.
+3. In the Supabase Dashboard, go to **Authentication → Hooks** and enable the **Customize Access Token (JWT) Claims Hook**, pointing at `public.custom_access_token_hook`. This can't be done via migration — see ARCHITECTURE.md.
+4. `npm run dev` and open [http://localhost:3000](http://localhost:3000).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev    # start the dev server
+npm run test   # run the vitest unit suite
+npm run build  # production build (runs the route-guard check first)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Database migrations
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+SQL migrations live in `supabase/migrations/`, applied to the live project via the Supabase MCP. There is no local Supabase CLI/Docker stack wired up yet — see ARCHITECTURE.md for what that means for RLS testing.
