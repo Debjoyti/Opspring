@@ -4,14 +4,15 @@ An AI-powered operating system for businesses — CRM, HRMS, Operations, Finance
 
 ## Stack
 
-Next.js (App Router) + Supabase (Postgres, Auth, RLS) + Tailwind + shadcn/ui, on Vercel.
+Next.js (App Router) + Supabase (Postgres, Auth, RLS) + AI SDK (via Vercel AI Gateway) + Tailwind + shadcn/ui, on Vercel.
 
 ## Getting started
 
 1. Copy the Supabase URL/anon key already in `.env.local` (git-ignored) — they point at the live `opspring` project.
 2. Fill in `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` from the [dashboard's API settings](https://supabase.com/dashboard/project/obmqaofldohremylkitt/settings/api). It's server-only, never shipped to the client, and only needed for admin/background scripts.
-3. In the Supabase Dashboard, go to **Authentication → Hooks** and enable the **Customize Access Token (JWT) Claims Hook**, pointing at `public.custom_access_token_hook`. This can't be done via migration — see ARCHITECTURE.md.
-4. `npm run dev` and open [http://localhost:3000](http://localhost:3000).
+3. Fill in `AI_GATEWAY_API_KEY` in `.env.local` ([get one here](https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai-gateway%2Fapi-keys)) — required for `/dashboard/assistant` to respond.
+4. In the Supabase Dashboard, go to **Authentication → Hooks** and enable the **Customize Access Token (JWT) Claims Hook**, pointing at `public.custom_access_token_hook`. This can't be done via migration — see ARCHITECTURE.md.
+5. `npm run dev` and open [http://localhost:3000](http://localhost:3000).
 
 ```bash
 npm run dev    # start the dev server

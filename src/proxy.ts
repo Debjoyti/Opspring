@@ -32,7 +32,12 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
 
-  if (!user && !isPublicPath) {
+  // API routes own their own auth response shape (JSON 401/403 via
+  // withOrgAuth) — redirecting them to an HTML login page here would break
+  // every fetch() caller expecting JSON.
+  const isApiPath = pathname.startsWith("/api/");
+
+  if (!user && !isPublicPath && !isApiPath) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
