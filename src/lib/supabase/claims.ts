@@ -33,5 +33,23 @@ export async function getVerifiedUserAndRoles(supabase: SupabaseClient) {
   if (error || !user) return { user: null, orgRoles: {} as Record<string, OrgRole> };
 
   const { data: { session } } = await supabase.auth.getSession();
-  return { user, orgRoles: decodeOrgRoles(session?.access_token) };
+  const orgRoles = decodeOrgRoles(session?.access_token);
+  if (Object.keys(orgRoles).length > 0) {
+    return { user, orgRoles };
+  }
+
+  const { data: memberships } = await supabase
+    .from("memberships")
+    .select("org_id, role")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .is("deleted_at", null);
+
+  for (const membership of memberships ?? []) {
+    if (typeof membership.org_id === "string" && isOrgRole(membership.role)) {
+      orgRoles[membership.org_id] = membership.role;
+    }
+  }
+
+  return { user, orgRoles };
 }
