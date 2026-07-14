@@ -19,7 +19,7 @@ export async function createOrganization(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("create_organization_with_owner", {
+  const { data: org, error } = await supabase.rpc("create_organization_with_owner", {
     p_name: name,
     p_slug: slugify(name),
   });
@@ -31,5 +31,8 @@ export async function createOrganization(formData: FormData) {
   // The org_roles claim is only in the JWT after it's re-minted.
   await supabase.auth.refreshSession();
 
-  redirect("/dashboard");
+  // Land on the org that was just created — without ?org= the dashboard
+  // defaults to the user's oldest org, which reads as "nothing happened"
+  // when creating a second one.
+  redirect(org?.id ? `/dashboard?org=${org.id}` : "/dashboard");
 }

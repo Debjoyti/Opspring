@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,15 +15,22 @@ export default async function OnboardingPage({
 }) {
   const { error } = await searchParams;
   const supabase = await createClient();
-  const { user, orgRoles } = await getVerifiedUserAndRoles(supabase);
+  const { user } = await getVerifiedUserAndRoles(supabase);
 
   if (!user) redirect("/login");
-  if (Object.keys(orgRoles).length > 0) redirect("/dashboard");
+
+  // Users with orgs land here too, via the dashboard's "+ New organization"
+  // link — this page doubles as first-run onboarding and additional-org
+  // creation, so no redirect for existing members. Checked via an RLS-backed
+  // query (same source of truth as the dashboard), not the JWT claim, which
+  // can be stale or absent when the access-token hook isn't enabled.
+  const { data: existingOrgs } = await supabase.from("organizations").select("id").limit(1);
+  const hasOrgs = (existingOrgs ?? []).length > 0;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create your organization</CardTitle>
+        <CardTitle>{hasOrgs ? "Create a new organization" : "Create your organization"}</CardTitle>
         <CardDescription>You&apos;ll be its owner.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -37,6 +45,14 @@ export default async function OnboardingPage({
             Create organization
           </Button>
         </form>
+
+        {hasOrgs && (
+          <p className="text-center text-sm text-muted-foreground">
+            <Link href="/dashboard" className="font-medium text-foreground underline">
+              Back to dashboard
+            </Link>
+          </p>
+        )}
       </CardContent>
     </Card>
   );
