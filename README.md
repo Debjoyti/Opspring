@@ -18,7 +18,12 @@ Next.js (App Router) + Supabase (Postgres, Auth, RLS) + AI SDK (via Vercel AI Ga
 npm run dev    # start the dev server
 npm run test   # run the vitest unit suite
 npm run build  # production build (runs the route-guard check first)
+npm run seed   # create a demo org with a member per role (needs SUPABASE_SERVICE_ROLE_KEY)
 ```
+
+## Demo data
+
+`npm run seed` creates "Acme Demo Co" with one confirmed, ready-to-log-in user per role (`owner@acme-demo.test` through `guest@acme-demo.test`, password `DemoPassword123!`). It uses the Auth Admin API to create users — never raw SQL against `auth.users` — and is idempotent, so re-running it just reconciles roles instead of duplicating anything. See `scripts/seed.mjs`.
 
 ## Database migrations
 
