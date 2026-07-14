@@ -14,9 +14,9 @@ Opspring's sibling project, `myoffice`, drifted into two competing tenant models
 
 Every tenant table has an RLS policy that checks the caller's JWT claims — never `USING (true)`, never "trust the `company_id` the app code happened to filter by."
 
-1. A **custom access token hook** (`public.custom_access_token_hook`, migration `0002`) runs on every token mint/refresh. It reads the user's active memberships and injects an `org_roles` claim into the JWT: `{"<org_id>": "<role>", ...}` — every org the user belongs to, not just one, so switching the active org in the UI doesn't require a token refresh.
-2. **Must be enabled manually** in the Supabase Dashboard (Authentication → Hooks → Customize Access Token Claims Hook) — this isn't expressible in a SQL migration. Until it's enabled, `org_roles` is empty and every RLS policy denies access (fails closed, not open).
-3. `private.jwt_org_ids()` and `private.jwt_role_for_org(org_id)` (migration `0001`) parse that claim. RLS policies use them, e.g.:
+1. A **custom access token hook** (`public.custom_access_token_hook`, migration `0002`) can run on every token mint/refresh. It reads the user's active memberships and injects an `org_roles` claim into the JWT: `{"<org_id>": "<role>", ...}` — every org the user belongs to, not just one, so switching the active org in the UI doesn't require a token refresh.
+2. `private.jwt_org_roles()` prefers that JWT claim when present, and falls back to active rows in `memberships` for `auth.uid()` (migration `0006`). This keeps RLS working even when the dashboard hook has not been enabled yet.
+3. `private.jwt_org_ids()` and `private.jwt_role_for_org(org_id)` parse those roles. RLS policies use them, e.g.:
    ```sql
    using (org_id = any (private.jwt_org_ids()))
    ```
@@ -27,7 +27,7 @@ Every tenant table has an RLS policy that checks the caller's JWT claims — nev
 
 - `src/lib/supabase/server.ts` — per-request SSR client, scoped to the caller's session cookie. **Every normal read/write goes through this**, so RLS is actually exercised. This is the opposite of myoffice's pattern, where routes used the service-role client and enforced tenancy only in app code.
 - `src/lib/supabase/admin.ts` — service-role, bypasses RLS entirely. Server-only, reserved for Inngest jobs and admin scripts — never imported by code that serves a user request.
-- Authentication is verified with `supabase.auth.getUser()` (round-trips to the Auth server), never `getSession()` alone for authentication — myoffice had a period where `getSession()` trusted an unverified cookie. `getSession()` is only read *after* `getUser()` has already validated the session, purely to extract the (now-trusted) `org_roles` claim from the JWT payload (`src/lib/supabase/claims.ts`).
+- Authentication is verified with `supabase.auth.getUser()` (round-trips to the Auth server), never `getSession()` alone for authentication — myoffice had a period where `getSession()` trusted an unverified cookie. `getSession()` is only read *after* `getUser()` has already validated the session, to extract the (now-trusted) `org_roles` claim from the JWT payload when present (`src/lib/supabase/claims.ts`). If the claim is absent, the server reads active memberships through the same RLS-protected Supabase client.
 
 ## API guard
 
