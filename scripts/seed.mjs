@@ -93,15 +93,74 @@ async function ensureMembership(orgId, userId, role) {
   if (error) throw new Error(`Could not create membership: ${error.message}`);
 }
 
+async function seedCrm(orgId, ownerId) {
+  // Idempotent: skip if this org already has CRM data.
+  const { count } = await admin
+    .from("crm_accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId);
+  if ((count ?? 0) > 0) {
+    console.log("\nCRM demo data already present — skipping.");
+    return;
+  }
+
+  const account = async (name, industry, website) => {
+    const { data, error } = await admin
+      .from("crm_accounts")
+      .insert({ org_id: orgId, name, industry, website, owner_id: ownerId })
+      .select("id")
+      .single();
+    if (error) throw new Error(`account ${name}: ${error.message}`);
+    return data.id;
+  };
+
+  const globex = await account("Globex Corporation", "Manufacturing", "https://globex.example");
+  const initech = await account("Initech", "Software", "https://initech.example");
+  const umbrella = await account("Umbrella Health", "Healthcare", "https://umbrella.example");
+
+  await admin.from("crm_contacts").insert([
+    { org_id: orgId, account_id: globex, first_name: "Hank", last_name: "Scorpio", email: "hank@globex.example", title: "CEO", owner_id: ownerId },
+    { org_id: orgId, account_id: initech, first_name: "Bill", last_name: "Lumbergh", email: "bill@initech.example", title: "VP Operations", owner_id: ownerId },
+    { org_id: orgId, account_id: umbrella, first_name: "Alice", last_name: "Chen", email: "alice@umbrella.example", title: "Procurement Lead", owner_id: ownerId },
+  ]);
+
+  await admin.from("crm_leads").insert([
+    { org_id: orgId, name: "Priya Nair", company: "Wayne Enterprises", email: "priya@wayne.example", source: "Website", status: "new", owner_id: ownerId },
+    { org_id: orgId, name: "Marcus Reid", company: "Stark Industries", email: "marcus@stark.example", source: "Referral", status: "contacted", owner_id: ownerId },
+    { org_id: orgId, name: "Lena Ortiz", company: "Cyberdyne", email: "lena@cyberdyne.example", source: "Event", status: "qualified", owner_id: ownerId },
+    { org_id: orgId, name: "Tom Fisher", company: "Soylent Co", email: "tom@soylent.example", source: "Cold call", status: "unqualified", owner_id: ownerId },
+  ]);
+
+  await admin.from("crm_deals").insert([
+    { org_id: orgId, name: "Globex - Annual platform license", account_id: globex, amount: 48000, stage: "proposal", owner_id: ownerId },
+    { org_id: orgId, name: "Initech - Pilot rollout", account_id: initech, amount: 15000, stage: "qualified", owner_id: ownerId },
+    { org_id: orgId, name: "Umbrella - Data migration", account_id: umbrella, amount: 32000, stage: "negotiation", owner_id: ownerId },
+    { org_id: orgId, name: "Globex - Support add-on", account_id: globex, amount: 12000, stage: "won", owner_id: ownerId },
+    { org_id: orgId, name: "Initech - Legacy renewal", account_id: initech, amount: 8000, stage: "lost", owner_id: ownerId },
+  ]);
+
+  await admin.from("crm_activities").insert([
+    { org_id: orgId, type: "call", subject: "Discovery call with Globex", notes: "Discussed licensing tiers and timeline.", related_type: "account", related_id: globex, actor_id: ownerId, done: true },
+    { org_id: orgId, type: "email", subject: "Sent proposal to Initech", notes: "Proposal PDF for pilot rollout.", related_type: "account", related_id: initech, actor_id: ownerId, done: true },
+    { org_id: orgId, type: "meeting", subject: "Umbrella migration scoping", notes: "Reviewed data volumes and cutover plan.", related_type: "account", related_id: umbrella, actor_id: ownerId, done: false },
+  ]);
+
+  console.log("\nSeeded CRM demo data: 3 accounts, 3 contacts, 4 leads, 5 deals, 3 activities.");
+}
+
 async function main() {
   const orgId = await findOrCreateOrg();
   console.log(`Demo org: ${DEMO_ORG.name} (${orgId})\n`);
 
+  let ownerId = null;
   for (const { email, role } of DEMO_USERS) {
     const userId = await findOrCreateUser(email);
     await ensureMembership(orgId, userId, role);
+    if (role === "owner") ownerId = userId;
     console.log(`  ${role.padEnd(8)} ${email}`);
   }
+
+  if (ownerId) await seedCrm(orgId, ownerId);
 
   console.log(`\nDone. Sign in as any of the above (password: ${DEMO_PASSWORD}).`);
 }
