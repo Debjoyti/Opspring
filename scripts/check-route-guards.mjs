@@ -8,7 +8,9 @@ const PUBLIC_ROUTES = new Set([
   // "src/app/api/v1/health/route.ts",
 ]);
 
-const GUARD_MARKERS = ["withOrgAuth("];
+// crudCollection/crudItem wrap their handlers in withOrgAuth internally
+// (see src/lib/api/crud-route.ts), so a route built from them is guarded too.
+const GUARD_MARKERS = ["withOrgAuth(", "crudCollection(", "crudItem("];
 
 const files = globSync("src/app/api/**/route.ts").map((f) => f.replace(/\\/g, "/"));
 const violations = [];
