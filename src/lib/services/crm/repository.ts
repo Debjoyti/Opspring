@@ -11,20 +11,46 @@ export type CrmTable =
   | "crm_contacts"
   | "crm_leads"
   | "crm_deals"
-  | "crm_activities";
+  | "crm_activities"
+  | "crm_pipelines"
+  | "crm_pipeline_stages"
+  | "crm_notes"
+  | "crm_products"
+  | "crm_deal_items"
+  | "crm_quotes"
+  | "crm_quote_items"
+  | "crm_email_templates"
+  | "crm_invoices"
+  | "crm_invoice_items"
+  | "crm_payments"
+  | "crm_automation_rules"
+  | "crm_automation_runs"
+  | "crm_saved_views"
+  | "crm_cadences"
+  | "crm_cadence_steps"
+  | "crm_cadence_enrollments";
 
 export async function listRows(
   supabase: SupabaseClient,
   table: CrmTable,
   orgId: string,
-  options: { select?: string; order?: string; ascending?: boolean } = {},
+  options: {
+    select?: string;
+    order?: string;
+    ascending?: boolean;
+    // Extra equality filters (column names are always code literals).
+    filters?: Record<string, string | number | boolean | null>;
+    limit?: number;
+  } = {},
 ) {
   const { select = "*", order = "created_at", ascending = false } = options;
-  const { data, error } = await supabase
-    .from(table)
-    .select(select)
-    .eq("org_id", orgId)
-    .order(order, { ascending });
+  let query = supabase.from(table).select(select).eq("org_id", orgId);
+  for (const [column, value] of Object.entries(options.filters ?? {})) {
+    query = value === null ? query.is(column, null) : query.eq(column, value);
+  }
+  query = query.order(order, { ascending });
+  if (options.limit) query = query.limit(options.limit);
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return data ?? [];
 }

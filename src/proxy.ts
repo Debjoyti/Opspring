@@ -1,7 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/auth/callback"];
+// /q/<token> is the customer-facing quote page — anonymous by design; the
+// token is the credential and data access goes through SECURITY DEFINER
+// functions that expose only that quote (see migration 0011).
+const PUBLIC_PATHS = ["/login", "/signup", "/auth/callback", "/q/"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

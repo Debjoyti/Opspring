@@ -131,12 +131,50 @@ async function seedCrm(orgId, ownerId) {
     { org_id: orgId, name: "Tom Fisher", company: "Soylent Co", email: "tom@soylent.example", source: "Cold call", status: "unqualified", owner_id: ownerId },
   ]);
 
+  // Deals live in the org's default pipeline (created by migration 0008's
+  // organizations trigger / backfill); stages are looked up by name.
+  const { data: pipeline, error: pipelineError } = await admin
+    .from("crm_pipelines")
+    .select("id, stages:crm_pipeline_stages(id, name, kind)")
+    .eq("org_id", orgId)
+    .eq("is_default", true)
+    .single();
+  if (pipelineError) throw new Error(`default pipeline: ${pipelineError.message}`);
+  const stageByName = Object.fromEntries(pipeline.stages.map((s) => [s.name, s]));
+  const deal = (name, account_id, amount, stageName) => {
+    const stage = stageByName[stageName];
+    if (!stage) throw new Error(`stage ${stageName} not found in default pipeline`);
+    return {
+      org_id: orgId, name, account_id, amount, owner_id: ownerId,
+      pipeline_id: pipeline.id, stage_id: stage.id,
+      closed_at: stage.kind === "open" ? null : new Date().toISOString(),
+      lost_reason: stage.kind === "lost" ? "Chose competitor" : null,
+    };
+  };
   await admin.from("crm_deals").insert([
-    { org_id: orgId, name: "Globex - Annual platform license", account_id: globex, amount: 48000, stage: "proposal", owner_id: ownerId },
-    { org_id: orgId, name: "Initech - Pilot rollout", account_id: initech, amount: 15000, stage: "qualified", owner_id: ownerId },
-    { org_id: orgId, name: "Umbrella - Data migration", account_id: umbrella, amount: 32000, stage: "negotiation", owner_id: ownerId },
-    { org_id: orgId, name: "Globex - Support add-on", account_id: globex, amount: 12000, stage: "won", owner_id: ownerId },
-    { org_id: orgId, name: "Initech - Legacy renewal", account_id: initech, amount: 8000, stage: "lost", owner_id: ownerId },
+    deal("Globex - Annual platform license", globex, 48000, "Proposal"),
+    deal("Initech - Pilot rollout", initech, 15000, "Qualified"),
+    deal("Umbrella - Data migration", umbrella, 32000, "Negotiation"),
+    deal("Globex - Support add-on", globex, 12000, "Won"),
+    deal("Initech - Legacy renewal", initech, 8000, "Lost"),
+  ]);
+
+  await admin.from("crm_products").insert([
+    { org_id: orgId, name: "Platform License", sku: "PLT-100", unit_price: 1200, billing_interval: "monthly", owner_id: ownerId },
+    { org_id: orgId, name: "Onboarding Package", sku: "SVC-ONB", unit_price: 5000, billing_interval: "one_time", owner_id: ownerId },
+    { org_id: orgId, name: "Premium Support", sku: "SUP-PREM", unit_price: 300, billing_interval: "monthly", owner_id: ownerId },
+  ]);
+
+  const { data: cadence, error: cadenceError } = await admin
+    .from("crm_cadences")
+    .insert({ org_id: orgId, name: "New lead intro", description: "Standard first-touch sequence", owner_id: ownerId })
+    .select("id")
+    .single();
+  if (cadenceError) throw new Error(`cadence: ${cadenceError.message}`);
+  await admin.from("crm_cadence_steps").insert([
+    { org_id: orgId, cadence_id: cadence.id, position: 0, day_offset: 0, activity_type: "call", subject: "Intro call" },
+    { org_id: orgId, cadence_id: cadence.id, position: 1, day_offset: 2, activity_type: "email", subject: "Send intro email" },
+    { org_id: orgId, cadence_id: cadence.id, position: 2, day_offset: 5, activity_type: "task", subject: "Follow up if no reply" },
   ]);
 
   await admin.from("crm_activities").insert([
@@ -145,7 +183,9 @@ async function seedCrm(orgId, ownerId) {
     { org_id: orgId, type: "meeting", subject: "Umbrella migration scoping", notes: "Reviewed data volumes and cutover plan.", related_type: "account", related_id: umbrella, actor_id: ownerId, done: false },
   ]);
 
-  console.log("\nSeeded CRM demo data: 3 accounts, 3 contacts, 4 leads, 5 deals, 3 activities.");
+  console.log(
+    "\nSeeded CRM demo data: 3 accounts, 3 contacts, 4 leads, 5 deals, 3 products, 1 cadence, 3 activities.",
+  );
 }
 
 async function main() {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { z } from "zod";
-import { withOrgAuth } from "@/lib/api/handler";
+import { withOrgAuth, type ApiContext } from "@/lib/api/handler";
 import {
   deleteRow,
   getRow,
@@ -22,6 +22,8 @@ export function crudCollection<Schema extends z.ZodObject<z.ZodRawShape>>(config
   select?: string;
   order?: string;
   ownerField?: string;
+  // Post-create hook (e.g. automations). Must not throw for expected failures.
+  afterCreate?: (ctx: ApiContext, row: Record<string, unknown>) => Promise<void>;
 }) {
   const GET = withOrgAuth(async (_req, ctx) => {
     const rows = await listRows(ctx.supabase, config.table, ctx.orgId, {
@@ -43,6 +45,9 @@ export function crudCollection<Schema extends z.ZodObject<z.ZodRawShape>>(config
     const values: Record<string, unknown> = { ...(parsed.data as Record<string, unknown>) };
     if (config.ownerField) values[config.ownerField] = ctx.userId;
     const row = await insertRow(ctx.supabase, config.table, ctx.orgId, values);
+    if (config.afterCreate) {
+      await config.afterCreate(ctx, row as Record<string, unknown>);
+    }
     return NextResponse.json({ data: row }, { status: 201 });
   });
 

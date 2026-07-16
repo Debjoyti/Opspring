@@ -33,10 +33,14 @@ export type FieldOption = { value: string; label: string };
 export type FieldDef = {
   name: string;
   label: string;
-  type?: "text" | "email" | "tel" | "number" | "date" | "textarea" | "select";
+  type?: "text" | "email" | "tel" | "number" | "date" | "textarea" | "select" | "checkbox";
   options?: FieldOption[];
   required?: boolean;
   placeholder?: string;
+  // Prefilled value for new records.
+  defaultValue?: string;
+  // Default for new records (checkbox fields only).
+  defaultChecked?: boolean;
   // Hidden from the table but still editable in the form.
   hideInTable?: boolean;
 };
@@ -88,6 +92,10 @@ export function EntityManager<T extends Row>({
     const formData = new FormData(e.currentTarget);
     const values: Record<string, unknown> = {};
     for (const field of fields) {
+      if (field.type === "checkbox") {
+        values[field.name] = formData.get(field.name) === "on";
+        continue;
+      }
       const raw = formData.get(field.name);
       if (raw === null) continue;
       const str = String(raw);
@@ -176,7 +184,24 @@ export function EntityManager<T extends Row>({
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
             {fields.map((field) => {
-              const current = editing ? String(editing[field.name] ?? "") : "";
+              const current = editing
+                ? String(editing[field.name] ?? "")
+                : (field.defaultValue ?? "");
+              if (field.type === "checkbox") {
+                const checked = editing
+                  ? Boolean(editing[field.name])
+                  : (field.defaultChecked ?? true);
+                return (
+                  <label key={field.name} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name={field.name}
+                      defaultChecked={checked}
+                    />
+                    {field.label}
+                  </label>
+                );
+              }
               return (
                 <div key={field.name} className="space-y-1.5">
                   <Label htmlFor={field.name}>{field.label}</Label>
