@@ -40,6 +40,7 @@ type Quote = {
   number: number;
   title: string;
   status: string;
+  public_token: string;
   currency: string;
   discount_pct: number;
   tax_rate: number;
@@ -141,6 +142,19 @@ export function QuotesClient({ orgId }: { orgId: string }) {
       }),
     onSuccess: invalidate,
     onError: (err) => alert(err instanceof Error ? err.message : "Status change failed"),
+  });
+
+  const toInvoice = useMutation({
+    mutationFn: (quote: Quote) =>
+      crmFetch("invoices", orgId, {
+        method: "POST",
+        body: JSON.stringify({ quote_id: quote.id, title: quote.title }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm", "invoices", orgId] });
+      alert("Invoice created — see the Invoices screen.");
+    },
+    onError: (err) => alert(err instanceof Error ? err.message : "Invoice creation failed"),
   });
 
   const addItem = useMutation({
@@ -287,6 +301,32 @@ export function QuotesClient({ orgId }: { orgId: string }) {
                             {STATUS_ACTION_LABEL[status] ?? status}
                           </Button>
                         ))}
+                        {quote.status !== "draft" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7"
+                            title="Copy the customer-facing link"
+                            onClick={() =>
+                              navigator.clipboard.writeText(
+                                `${window.location.origin}/q/${quote.public_token}`,
+                              )
+                            }
+                          >
+                            Copy link
+                          </Button>
+                        )}
+                        {quote.status === "accepted" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7"
+                            disabled={toInvoice.isPending}
+                            onClick={() => toInvoice.mutate(quote)}
+                          >
+                            To invoice
+                          </Button>
+                        )}
                         <a
                           href={`/print/quotes/${quote.id}?org=${orgId}`}
                           target="_blank"

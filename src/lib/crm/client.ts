@@ -16,7 +16,8 @@ export type CrmResource =
   | "notes"
   | "products"
   | "quotes"
-  | "templates";
+  | "templates"
+  | "invoices";
 
 async function api<T>(
   path: string,

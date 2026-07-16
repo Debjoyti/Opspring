@@ -207,6 +207,64 @@ export const quotePatchInput = quoteInput.omit({ items: true }).partial();
 
 export const quoteStatusInput = z.object({ status: z.enum(QUOTE_STATUSES) });
 
+// Invoices ---------------------------------------------------------------------------
+
+export const INVOICE_STATUSES = [
+  "draft",
+  "sent",
+  "partially_paid",
+  "paid",
+  "void",
+] as const;
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+
+export const PAYMENT_METHODS = [
+  "bank_transfer",
+  "card",
+  "cash",
+  "check",
+  "other",
+] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+const optionalDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .optional()
+  .or(z.literal("").transform(() => undefined));
+
+export const invoiceInput = z.object({
+  title: z.string().trim().min(1, "Title is required").max(200),
+  quote_id: optionalUuid,
+  deal_id: optionalUuid,
+  account_id: optionalUuid,
+  contact_id: optionalUuid,
+  currency: z.string().trim().length(3).default("USD"),
+  discount_pct: z.coerce.number().min(0).max(100).default(0),
+  tax_rate: z.coerce.number().min(0).max(100).default(0),
+  issue_date: optionalDate,
+  due_date: optionalDate,
+  notes: z.string().trim().max(2000).optional().or(z.literal("").transform(() => undefined)),
+  terms: z.string().trim().max(2000).optional().or(z.literal("").transform(() => undefined)),
+  items: z.array(lineItemInput).max(50).optional(),
+});
+export type InvoiceInput = z.infer<typeof invoiceInput>;
+
+export const invoicePatchInput = invoiceInput.omit({ items: true, quote_id: true }).partial();
+
+export const invoiceStatusInput = z.object({
+  status: z.enum(["sent", "void"]),
+});
+
+export const paymentInput = z.object({
+  amount: z.coerce.number().positive("Amount must be positive"),
+  method: z.enum(PAYMENT_METHODS).default("bank_transfer"),
+  reference: optionalText,
+  notes: optionalText,
+  paid_at: z.string().datetime().optional().or(z.literal("").transform(() => undefined)),
+});
+export type PaymentInput = z.infer<typeof paymentInput>;
+
 // Email templates -------------------------------------------------------------------
 
 export const templateInput = z.object({
