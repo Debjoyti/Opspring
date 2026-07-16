@@ -1,12 +1,26 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEAL_STAGES, LEAD_STATUSES, OPEN_STAGES, type DealStage, type LeadStatus } from "./types";
+import { LEAD_STATUSES, type LeadStatus, type StageKind } from "./types";
+
+export type StageBreakdown = {
+  id: string;
+  name: string;
+  kind: StageKind;
+  probability: number;
+  count: number;
+  value: number;
+  weighted: number;
+};
 
 export type CrmOverview = {
   totals: { leads: number; accounts: number; contacts: number; deals: number };
   openPipelineValue: number;
+  weightedForecast: number;
   wonValue: number;
+  openTasks: number;
+  overdueTasks: number;
   leadsByStatus: Record<LeadStatus, number>;
-  dealsByStage: Record<DealStage, { count: number; value: number }>;
+  avgLeadScore: number | null;
+  stageBreakdown: StageBreakdown[];
   recentActivities: {
     id: string;
     type: string;
@@ -26,42 +40,111 @@ export async function getCrmOverview(
   supabase: SupabaseClient,
   orgId: string,
 ): Promise<CrmOverview> {
-  const [leads, deals, accountsCount, contactsCount, activities] = await Promise.all([
-    supabase.from("crm_leads").select("status").eq("org_id", orgId),
-    supabase.from("crm_deals").select("stage, amount").eq("org_id", orgId),
-    supabase.from("crm_accounts").select("id", { count: "exact", head: true }).eq("org_id", orgId),
-    supabase.from("crm_contacts").select("id", { count: "exact", head: true }).eq("org_id", orgId),
-    supabase
-      .from("crm_activities")
-      .select("id, type, subject, created_at, done")
-      .eq("org_id", orgId)
-      .order("created_at", { ascending: false })
-      .limit(8),
-  ]);
+  const nowIso = new Date().toISOString();
+  const [leads, deals, stages, accountsCount, contactsCount, activities, openTasks, overdueTasks] =
+    await Promise.all([
+      supabase.from("crm_leads").select("status, score").eq("org_id", orgId),
+      supabase.from("crm_deals").select("stage_id, amount").eq("org_id", orgId),
+      supabase
+        .from("crm_pipeline_stages")
+        .select("id, name, kind, probability, position, pipeline_id, crm_pipelines!inner(is_default)")
+        .eq("org_id", orgId)
+        .order("position", { ascending: true }),
+      supabase.from("crm_accounts").select("id", { count: "exact", head: true }).eq("org_id", orgId),
+      supabase.from("crm_contacts").select("id", { count: "exact", head: true }).eq("org_id", orgId),
+      supabase
+        .from("crm_activities")
+        .select("id, type, subject, created_at, done")
+        .eq("org_id", orgId)
+        .order("created_at", { ascending: false })
+        .limit(8),
+      supabase
+        .from("crm_activities")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("type", "task")
+        .eq("done", false),
+      supabase
+        .from("crm_activities")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("type", "task")
+        .eq("done", false)
+        .lt("due_at", nowIso),
+    ]);
 
   const leadsByStatus = Object.fromEntries(
     LEAD_STATUSES.map((s) => [s, 0]),
   ) as Record<LeadStatus, number>;
+  let scoreSum = 0;
+  let scoreCount = 0;
   for (const row of leads.data ?? []) {
     const status = row.status as LeadStatus;
     if (status in leadsByStatus) leadsByStatus[status] += 1;
+    if (typeof row.score === "number") {
+      scoreSum += row.score;
+      scoreCount += 1;
+    }
   }
 
-  const dealsByStage = Object.fromEntries(
-    DEAL_STAGES.map((s) => [s, { count: 0, value: 0 }]),
-  ) as Record<DealStage, { count: number; value: number }>;
+  type StageMeta = {
+    id: string;
+    name: string;
+    kind: StageKind;
+    probability: number;
+    isDefaultPipeline: boolean;
+  };
+  const stageMeta = new Map<string, StageMeta>();
+  for (const row of stages.data ?? []) {
+    const pipelines = row.crm_pipelines as unknown as { is_default: boolean } | { is_default: boolean }[];
+    const isDefault = Array.isArray(pipelines)
+      ? pipelines.some((p) => p.is_default)
+      : Boolean(pipelines?.is_default);
+    stageMeta.set(row.id as string, {
+      id: row.id as string,
+      name: row.name as string,
+      kind: row.kind as StageKind,
+      probability: Number(row.probability ?? 0),
+      isDefaultPipeline: isDefault,
+    });
+  }
+
+  const perStage = new Map<string, { count: number; value: number }>();
   let openPipelineValue = 0;
+  let weightedForecast = 0;
   let wonValue = 0;
   for (const row of deals.data ?? []) {
-    const stage = row.stage as DealStage;
+    const meta = stageMeta.get(row.stage_id as string);
     const amount = Number(row.amount ?? 0);
-    if (stage in dealsByStage) {
-      dealsByStage[stage].count += 1;
-      dealsByStage[stage].value += amount;
+    if (!meta) continue;
+    const agg = perStage.get(meta.id) ?? { count: 0, value: 0 };
+    agg.count += 1;
+    agg.value += amount;
+    perStage.set(meta.id, agg);
+    if (meta.kind === "open") {
+      openPipelineValue += amount;
+      weightedForecast += (amount * meta.probability) / 100;
     }
-    if ((OPEN_STAGES as string[]).includes(stage)) openPipelineValue += amount;
-    if (stage === "won") wonValue += amount;
+    if (meta.kind === "won") wonValue += amount;
   }
+
+  // The overview chart shows the default pipeline's stages (in order), so it
+  // stays readable even when an org runs several pipelines.
+  const stageBreakdown: StageBreakdown[] = (stages.data ?? [])
+    .filter((row) => stageMeta.get(row.id as string)?.isDefaultPipeline)
+    .map((row) => {
+      const meta = stageMeta.get(row.id as string)!;
+      const agg = perStage.get(meta.id) ?? { count: 0, value: 0 };
+      return {
+        id: meta.id,
+        name: meta.name,
+        kind: meta.kind,
+        probability: meta.probability,
+        count: agg.count,
+        value: agg.value,
+        weighted: meta.kind === "open" ? (agg.value * meta.probability) / 100 : 0,
+      };
+    });
 
   return {
     totals: {
@@ -71,9 +154,13 @@ export async function getCrmOverview(
       deals: (deals.data ?? []).length,
     },
     openPipelineValue,
+    weightedForecast,
     wonValue,
+    openTasks: openTasks.count ?? 0,
+    overdueTasks: overdueTasks.count ?? 0,
     leadsByStatus,
-    dealsByStage,
+    avgLeadScore: scoreCount > 0 ? Math.round(scoreSum / scoreCount) : null,
+    stageBreakdown,
     recentActivities: (activities.data ?? []) as CrmOverview["recentActivities"],
   };
 }

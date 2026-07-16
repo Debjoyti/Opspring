@@ -17,10 +17,7 @@ export default async function CrmOverviewPage({
   const supabase = await createClient();
   const overview = await getCrmOverview(supabase, activeOrg.id);
 
-  const maxStageValue = Math.max(
-    1,
-    ...Object.values(overview.dealsByStage).map((s) => s.value),
-  );
+  const maxStageValue = Math.max(1, ...overview.stageBreakdown.map((s) => s.value));
 
   return (
     <div className="space-y-6">
@@ -31,9 +28,19 @@ export default async function CrmOverviewPage({
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Open pipeline" value={formatCurrency(overview.openPipelineValue)} />
+        <StatCard
+          label="Weighted forecast"
+          value={formatCurrency(Math.round(overview.weightedForecast))}
+        />
         <StatCard label="Won revenue" value={formatCurrency(overview.wonValue)} />
-        <StatCard label="Accounts" value={overview.totals.accounts} />
-        <StatCard label="Contacts" value={overview.totals.contacts} />
+        <StatCard
+          label="Open tasks"
+          value={
+            overview.overdueTasks > 0
+              ? `${overview.openTasks} (${overview.overdueTasks} overdue)`
+              : overview.openTasks
+          }
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -48,10 +55,15 @@ export default async function CrmOverviewPage({
             </Link>
           </CardHeader>
           <CardContent className="space-y-3">
-            {Object.entries(overview.dealsByStage).map(([stage, s]) => (
-              <div key={stage}>
+            {overview.stageBreakdown.map((s) => (
+              <div key={s.id}>
                 <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="capitalize">{stage}</span>
+                  <span>
+                    {s.name}
+                    {s.kind === "open" && (
+                      <span className="ml-1 text-xs text-muted-foreground">{s.probability}%</span>
+                    )}
+                  </span>
                   <span className="text-muted-foreground">
                     {s.count} · {formatCurrency(s.value)}
                   </span>

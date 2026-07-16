@@ -52,6 +52,21 @@ The first real business module. Same architecture the rest of the app follows, s
 - **UI** (`src/app/dashboard/crm/*`): a real sidebar-nav dashboard (`src/components/dashboard/sidebar.tsx`) with an Overview (KPI cards, pipeline-by-stage bars, leads-by-status), a Deals **kanban pipeline** with stage-move controls, and Leads/Accounts/Contacts/Activities list+create+edit+delete screens. The CRUD screens share one `EntityManager` component driven by a field/column config; only Deals is bespoke. Data flows through TanStack Query against the API, with the active org carried in every request via the `x-org-id` header.
 - **Active org** is carried in the URL (`?org=`) and resolved once per request by `resolveActiveOrg` (`src/lib/dashboard/org-context.ts`), which also guards the whole dashboard.
 
+## CRM expansion (migration `0008`, branch `feature/world-class-crm`)
+
+Second slice of the CRM, following the exact same patterns (org-scoped RLS, Zod-validated `withOrgAuth` routes, JS-side aggregation, TanStack Query UI):
+
+- **Custom pipelines**: `crm_pipelines` + `crm_pipeline_stages` (per-stage win `probability`, `kind` of `open|won|lost`). Deals migrated from the fixed `crm_deal_stage` enum (dropped) to `stage_id`/`pipeline_id`; the backfill created a default "Sales Pipeline" per org and an `organizations` insert-trigger (`create_default_pipeline`, SECURITY DEFINER for the same reason as signup) does it for new orgs. Stage moves re-derive `pipeline_id` and close state (`closed_at`, `lost_reason`) server-side from the target stage's `kind` (`src/lib/services/crm/deals.ts`).
+- **Lead conversion**: `crm_convert_lead()` — SECURITY **INVOKER** on purpose, so every statement runs under the caller's RLS; the function exists only to make account-reuse + contact + optional deal + status flip atomic. Reached via `POST /api/v1/crm/leads/[id]/convert`.
+- **Lead scoring**: `src/lib/services/crm/scoring.ts`. Deterministic rules engine always available; when `AI_GATEWAY_API_KEY` is set the score comes from `generateObject` against `ASSISTANT_MODEL` with the rules as fallback. `score_source` records which path produced the number.
+- **Round-robin assignment** (`POST /leads/assign`): least-loaded active member first, counts include in-batch assignments (`src/lib/services/crm/assignment.ts` — pure, tested).
+- **CSV import/export**: hand-rolled RFC-4180 parser/serializer in `src/lib/csv.ts` (pure, tested); import validates per-row with the same Zod schema as the API and skips duplicate emails.
+- **Duplicates + merge**: email/phone/name grouping (`dedupe.ts`, pure, tested); merge fills the primary's empty fields, re-points notes/activities/FKs first and deletes duplicates last, so a mid-way failure never leaves dangling references.
+- **Notes & timeline**: polymorphic `crm_notes`; `GET /timeline` merges notes + activities per record.
+- **Reports** (`/dashboard/crm/reports`): funnel, win/loss by month + loss reasons, velocity (cycle days, open age), per-pipeline weighted forecast.
+- **Tasks** (`/dashboard/crm/tasks`): activities of type `task` bucketed overdue/today/upcoming/done.
+- Tags are `text[]` columns with GIN indexes on all four entities — deliberately not a join table at this scale.
+
 ## Known limitations / fast-follows
 
 - **No local Supabase CLI/Docker stack.** This environment has no Docker, so RLS was verified directly against the live project using `SET ROLE authenticated; SET request.jwt.claims = '...'` (see `scripts/verify-rls.sql`) rather than an automated integration test against a local stack. Wire up `supabase` CLI + Docker and turn that script into a CI check once available.
