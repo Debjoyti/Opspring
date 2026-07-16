@@ -301,6 +301,10 @@ export const automationAction = z.discriminatedUnion("type", [
     type: z.literal("add_tags"),
     tags: z.array(z.string().trim().min(1).max(50)).min(1).max(10),
   }),
+  z.object({
+    type: z.literal("enroll_in_cadence"),
+    cadence_id: z.string().uuid(),
+  }),
 ]);
 export type AutomationAction = z.infer<typeof automationAction>;
 
@@ -312,6 +316,34 @@ export const automationRuleInput = z.object({
   actions: z.array(automationAction).min(1, "Add at least one action").max(5),
 });
 export type AutomationRuleInput = z.infer<typeof automationRuleInput>;
+
+// Cadences ------------------------------------------------------------------------
+
+export const cadenceStepDef = z.object({
+  position: z.coerce.number().int().min(0).default(0),
+  day_offset: z.coerce.number().int().min(0).max(365).default(0),
+  activity_type: z.enum(ACTIVITY_TYPES).default("task"),
+  subject: z.string().trim().min(1, "Step subject is required").max(200),
+});
+
+export const cadenceInput = z.object({
+  name: z.string().trim().min(1, "Name is required").max(120),
+  description: optionalText,
+  active: z.boolean().default(true),
+  steps: z.array(cadenceStepDef).min(1, "Add at least one step").max(20).optional(),
+});
+export type CadenceInput = z.infer<typeof cadenceInput>;
+
+export const cadencePatchInput = cadenceInput.omit({ steps: true }).partial();
+
+export const cadenceStepInput = cadenceStepDef.extend({
+  cadence_id: z.string().uuid(),
+});
+
+export const enrollInput = z.object({
+  entity_type: z.enum(["lead", "contact"]),
+  entity_id: z.string().uuid(),
+});
 
 // Saved views ---------------------------------------------------------------------
 

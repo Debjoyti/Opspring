@@ -165,6 +165,18 @@ async function seedCrm(orgId, ownerId) {
     { org_id: orgId, name: "Premium Support", sku: "SUP-PREM", unit_price: 300, billing_interval: "monthly", owner_id: ownerId },
   ]);
 
+  const { data: cadence, error: cadenceError } = await admin
+    .from("crm_cadences")
+    .insert({ org_id: orgId, name: "New lead intro", description: "Standard first-touch sequence", owner_id: ownerId })
+    .select("id")
+    .single();
+  if (cadenceError) throw new Error(`cadence: ${cadenceError.message}`);
+  await admin.from("crm_cadence_steps").insert([
+    { org_id: orgId, cadence_id: cadence.id, position: 0, day_offset: 0, activity_type: "call", subject: "Intro call" },
+    { org_id: orgId, cadence_id: cadence.id, position: 1, day_offset: 2, activity_type: "email", subject: "Send intro email" },
+    { org_id: orgId, cadence_id: cadence.id, position: 2, day_offset: 5, activity_type: "task", subject: "Follow up if no reply" },
+  ]);
+
   await admin.from("crm_activities").insert([
     { org_id: orgId, type: "call", subject: "Discovery call with Globex", notes: "Discussed licensing tiers and timeline.", related_type: "account", related_id: globex, actor_id: ownerId, done: true },
     { org_id: orgId, type: "email", subject: "Sent proposal to Initech", notes: "Proposal PDF for pilot rollout.", related_type: "account", related_id: initech, actor_id: ownerId, done: true },
@@ -172,7 +184,7 @@ async function seedCrm(orgId, ownerId) {
   ]);
 
   console.log(
-    "\nSeeded CRM demo data: 3 accounts, 3 contacts, 4 leads, 5 deals, 3 products, 3 activities.",
+    "\nSeeded CRM demo data: 3 accounts, 3 contacts, 4 leads, 5 deals, 3 products, 1 cadence, 3 activities.",
   );
 }
 

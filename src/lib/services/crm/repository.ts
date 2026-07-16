@@ -25,7 +25,10 @@ export type CrmTable =
   | "crm_payments"
   | "crm_automation_rules"
   | "crm_automation_runs"
-  | "crm_saved_views";
+  | "crm_saved_views"
+  | "crm_cadences"
+  | "crm_cadence_steps"
+  | "crm_cadence_enrollments";
 
 export async function listRows(
   supabase: SupabaseClient,

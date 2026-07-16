@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { planRoundRobin } from "./assignment";
+import { enrollInCadence } from "./cadences";
 import type { AutomationAction, AutomationEvent } from "./types";
 
 export type AutomationRule = {
@@ -44,6 +45,7 @@ const ACTION_EVENTS: Record<AutomationAction["type"], AutomationEvent[]> = {
     "invoice_paid",
   ],
   add_tags: ["lead_created", "deal_created", "deal_stage_changed"],
+  enroll_in_cadence: ["lead_created"],
 };
 
 export function actionApplicable(
@@ -144,6 +146,15 @@ async function executeAction(
     });
     if (error) return { type: action.type, ok: false, detail: error.message };
     return { type: action.type, ok: true, detail: `task due ${dueAt.slice(0, 10)}` };
+  }
+
+  if (action.type === "enroll_in_cadence") {
+    const result = await enrollInCadence(supabase, orgId, userId, action.cadence_id, {
+      entity_type: "lead",
+      entity_id: payload.entityId,
+    });
+    if (!result.ok) return { type: action.type, ok: false, detail: result.error };
+    return { type: action.type, ok: true, detail: `${result.tasksCreated} tasks created` };
   }
 
   // add_tags

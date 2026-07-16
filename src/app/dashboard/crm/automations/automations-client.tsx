@@ -17,6 +17,8 @@ import {
 import { crmFetch, usePipelines } from "@/lib/crm/client";
 import type { AutomationAction, AutomationEvent } from "@/lib/services/crm/types";
 
+type CadenceOption = { id: string; name: string; active: boolean };
+
 type Rule = {
   id: string;
   name: string;
@@ -47,6 +49,7 @@ function actionSummary(action: AutomationAction): string {
   if (action.type === "assign_round_robin") return "Assign owner (round robin)";
   if (action.type === "create_task")
     return `Create task “${action.subject}” (due in ${action.due_in_days}d)`;
+  if (action.type === "enroll_in_cadence") return "Enroll in cadence";
   return `Add tags: ${action.tags.join(", ")}`;
 }
 
@@ -72,6 +75,16 @@ export function AutomationsClient({ orgId }: { orgId: string }) {
   const [taskDueDays, setTaskDueDays] = useState(3);
   const [useTags, setUseTags] = useState(false);
   const [tags, setTags] = useState("");
+  const [useCadence, setUseCadence] = useState(false);
+  const [cadenceId, setCadenceId] = useState("");
+
+  const { data: cadences } = useQuery({
+    queryKey: ["crm", "cadences", orgId],
+    queryFn: () =>
+      crmFetch<{ data: CadenceOption[] }>("cadences", orgId).then((r) =>
+        r.data.filter((c) => c.active),
+      ),
+  });
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["crm", "automations", orgId] });
@@ -120,6 +133,9 @@ export function AutomationsClient({ orgId }: { orgId: string }) {
         type: "add_tags",
         tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       });
+    }
+    if (useCadence && cadenceId && event === "lead_created") {
+      actions.push({ type: "enroll_in_cadence", cadence_id: cadenceId });
     }
     if (actions.length === 0) {
       setError("Pick at least one action.");
@@ -346,6 +362,32 @@ export function AutomationsClient({ orgId }: { orgId: string }) {
                       value={tags}
                       onChange={(e) => setTags(e.target.value)}
                     />
+                  )}
+                </>
+              )}
+              {event === "lead_created" && (
+                <>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={useCadence}
+                      onChange={(e) => setUseCadence(e.target.checked)}
+                    />
+                    Enroll in cadence
+                  </label>
+                  {useCadence && (
+                    <select
+                      value={cadenceId}
+                      onChange={(e) => setCadenceId(e.target.value)}
+                      className="ml-6 h-8 w-64 rounded-md border border-input bg-transparent px-2 text-xs"
+                    >
+                      <option value="">— pick a cadence —</option>
+                      {(cadences ?? []).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
                   )}
                 </>
               )}

@@ -63,6 +63,8 @@ type SavedView = {
   filters: { q?: string; status?: string; tag?: string };
 };
 
+type CadenceOption = { id: string; name: string; active: boolean };
+
 function scoreVariant(score: number): string {
   if (score >= 70) return "bg-emerald-600 text-white";
   if (score >= 40) return "bg-amber-500 text-white";
@@ -110,6 +112,32 @@ export function LeadsClient({ orgId }: { orgId: string }) {
       crmFetch<{ data: SavedView[] }>("views", orgId).then((r) =>
         r.data.filter((v) => v.resource === "leads"),
       ),
+  });
+
+  const { data: cadenceOptions } = useQuery({
+    queryKey: ["crm", "cadences", orgId],
+    queryFn: () =>
+      crmFetch<{ data: CadenceOption[] }>("cadences", orgId).then((r) =>
+        r.data.filter((c) => c.active),
+      ),
+  });
+
+  const [enrollLead, setEnrollLead] = useState<Lead | null>(null);
+  const doEnroll = useMutation({
+    mutationFn: ({ cadenceId, leadId }: { cadenceId: string; leadId: string }) =>
+      crmFetch(`cadences/${cadenceId}/enroll`, orgId, {
+        method: "POST",
+        body: JSON.stringify({ entity_type: "lead", entity_id: leadId }),
+      }),
+    onSuccess: () => {
+      setEnrollLead(null);
+      qc.invalidateQueries({ queryKey: ["crm", "cadences", orgId] });
+      qc.invalidateQueries({ queryKey: ["crm", "activities", orgId] });
+    },
+    onError: (err) =>
+      alert(err instanceof Error && err.message === "already_enrolled"
+        ? "This lead is already enrolled in that cadence."
+        : err instanceof Error ? err.message : "Enroll failed"),
   });
   const invalidateViews = () => qc.invalidateQueries({ queryKey: ["crm", "views", orgId] });
 
@@ -434,9 +462,14 @@ export function LeadsClient({ orgId }: { orgId: string }) {
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       {lead.status !== "converted" && (
-                        <Button variant="ghost" size="sm" onClick={() => setConvertLead(lead)}>
-                          Convert
-                        </Button>
+                        <>
+                          <Button variant="ghost" size="sm" onClick={() => setEnrollLead(lead)}>
+                            Enroll
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setConvertLead(lead)}>
+                            Convert
+                          </Button>
+                        </>
                       )}
                       <Button
                         variant="ghost"
@@ -651,6 +684,36 @@ export function LeadsClient({ orgId }: { orgId: string }) {
                     ))}
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Enroll in cadence */}
+      <Dialog open={Boolean(enrollLead)} onOpenChange={(o) => !o && setEnrollLead(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enroll {enrollLead?.name} in a cadence</DialogTitle>
+          </DialogHeader>
+          {(cadenceOptions ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No active cadences yet — create one on the Cadences screen.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              {(cadenceOptions ?? []).map((cadence) => (
+                <Button
+                  key={cadence.id}
+                  variant="outline"
+                  className="w-full justify-start"
+                  disabled={doEnroll.isPending}
+                  onClick={() =>
+                    enrollLead && doEnroll.mutate({ cadenceId: cadence.id, leadId: enrollLead.id })
+                  }
+                >
+                  {cadence.name}
+                </Button>
               ))}
             </div>
           )}
