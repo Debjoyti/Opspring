@@ -279,6 +279,51 @@ export const templateRenderInput = z.object({
   entity_id: z.string().uuid(),
 });
 
+// Automations ---------------------------------------------------------------------
+
+export const AUTOMATION_EVENTS = [
+  "lead_created",
+  "deal_created",
+  "deal_stage_changed",
+  "quote_accepted",
+  "invoice_paid",
+] as const;
+export type AutomationEvent = (typeof AUTOMATION_EVENTS)[number];
+
+export const automationAction = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("assign_round_robin") }),
+  z.object({
+    type: z.literal("create_task"),
+    subject: z.string().trim().min(1, "Task subject is required").max(200),
+    due_in_days: z.coerce.number().int().min(0).max(365).default(3),
+  }),
+  z.object({
+    type: z.literal("add_tags"),
+    tags: z.array(z.string().trim().min(1).max(50)).min(1).max(10),
+  }),
+]);
+export type AutomationAction = z.infer<typeof automationAction>;
+
+export const automationRuleInput = z.object({
+  name: z.string().trim().min(1, "Name is required").max(120),
+  enabled: z.boolean().default(true),
+  trigger_event: z.enum(AUTOMATION_EVENTS),
+  condition_stage_id: optionalUuid,
+  actions: z.array(automationAction).min(1, "Add at least one action").max(5),
+});
+export type AutomationRuleInput = z.infer<typeof automationRuleInput>;
+
+// Saved views ---------------------------------------------------------------------
+
+export const SAVED_VIEW_RESOURCES = ["leads", "deals", "contacts", "accounts"] as const;
+
+export const savedViewInput = z.object({
+  resource: z.enum(SAVED_VIEW_RESOURCES),
+  name: z.string().trim().min(1, "Name is required").max(80),
+  filters: z.record(z.string(), z.string()).default({}),
+});
+export type SavedViewInput = z.infer<typeof savedViewInput>;
+
 // Duplicates / merge -------------------------------------------------------------
 
 export const DUPLICATE_RESOURCES = ["leads", "contacts", "accounts"] as const;

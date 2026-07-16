@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withOrgAuth } from "@/lib/api/handler";
+import { runAutomations } from "@/lib/services/crm/automation";
 import { getRow, updateRow } from "@/lib/services/crm/repository";
 import { QUOTE_STATUS_STAMP, QUOTE_TRANSITIONS } from "@/lib/services/crm/quotes";
 import { quoteStatusInput } from "@/lib/services/crm/types";
@@ -39,5 +40,11 @@ export const POST = withOrgAuth(async (req, ctx) => {
   if (stamp) values[stamp] = new Date().toISOString();
 
   const row = await updateRow(ctx.supabase, "crm_quotes", ctx.orgId, id, values);
+  if (target === "accepted") {
+    await runAutomations(ctx.supabase, ctx.orgId, ctx.userId, "quote_accepted", {
+      entityType: "quote",
+      entityId: id,
+    });
+  }
   return NextResponse.json({ data: row });
 });

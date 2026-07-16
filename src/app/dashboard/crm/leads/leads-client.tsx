@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,13 @@ type DuplicateGroup = {
   records: (Lead | undefined)[];
 };
 
+type SavedView = {
+  id: string;
+  resource: string;
+  name: string;
+  filters: { q?: string; status?: string; tag?: string };
+};
+
 function scoreVariant(score: number): string {
   if (score >= 70) return "bg-emerald-600 text-white";
   if (score >= 40) return "bg-amber-500 text-white";
@@ -89,7 +96,50 @@ export function LeadsClient({ orgId }: { orgId: string }) {
   const [timelineLead, setTimelineLead] = useState<Lead | null>(null);
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
 
+  // Filters + saved views
+  const [filterQ, setFilterQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterTag, setFilterTag] = useState("");
+  const [activeViewId, setActiveViewId] = useState("");
+
   const invalidateLeads = () => qc.invalidateQueries({ queryKey: ["crm", "leads", orgId] });
+
+  const { data: views } = useQuery({
+    queryKey: ["crm", "views", orgId],
+    queryFn: () =>
+      crmFetch<{ data: SavedView[] }>("views", orgId).then((r) =>
+        r.data.filter((v) => v.resource === "leads"),
+      ),
+  });
+  const invalidateViews = () => qc.invalidateQueries({ queryKey: ["crm", "views", orgId] });
+
+  function applyView(view: SavedView | null) {
+    setActiveViewId(view?.id ?? "");
+    setFilterQ(view?.filters.q ?? "");
+    setFilterStatus(view?.filters.status ?? "");
+    setFilterTag(view?.filters.tag ?? "");
+  }
+
+  async function saveCurrentView() {
+    const name = prompt("Name this view", "My leads view");
+    if (!name?.trim()) return;
+    const filters: Record<string, string> = {};
+    if (filterQ) filters.q = filterQ;
+    if (filterStatus) filters.status = filterStatus;
+    if (filterTag) filters.tag = filterTag;
+    await crmFetch("views", orgId, {
+      method: "POST",
+      body: JSON.stringify({ resource: "leads", name: name.trim(), filters }),
+    });
+    invalidateViews();
+  }
+
+  async function deleteActiveView() {
+    if (!activeViewId) return;
+    await crmFetch(`views/${activeViewId}`, orgId, { method: "DELETE" });
+    applyView(null);
+    invalidateViews();
+  }
 
   const doImport = useMutation({
     mutationFn: (csv: string) =>
@@ -184,7 +234,22 @@ export function LeadsClient({ orgId }: { orgId: string }) {
     }
   }
 
-  const leads = data ?? [];
+  const leads = useMemo(() => {
+    const q = filterQ.trim().toLowerCase();
+    const tag = filterTag.trim().toLowerCase();
+    return (data ?? []).filter((lead) => {
+      if (filterStatus && lead.status !== filterStatus) return false;
+      if (tag && !(lead.tags ?? []).some((t) => t.toLowerCase().includes(tag))) return false;
+      if (q) {
+        const haystack = [lead.name, lead.company, lead.email, lead.title]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [data, filterQ, filterStatus, filterTag]);
 
   return (
     <div className="space-y-4">
@@ -241,6 +306,57 @@ export function LeadsClient({ orgId }: { orgId: string }) {
           >
             New lead
           </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={filterQ}
+          onChange={(e) => setFilterQ(e.target.value)}
+          placeholder="Filter by name, company, email…"
+          className="h-8 w-56 text-sm"
+        />
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
+        >
+          <option value="">All statuses</option>
+          {LEAD_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s[0].toUpperCase() + s.slice(1)}
+            </option>
+          ))}
+        </select>
+        <Input
+          value={filterTag}
+          onChange={(e) => setFilterTag(e.target.value)}
+          placeholder="Tag…"
+          className="h-8 w-28 text-sm"
+        />
+        <div className="ml-auto flex items-center gap-2">
+          <select
+            value={activeViewId}
+            onChange={(e) =>
+              applyView((views ?? []).find((v) => v.id === e.target.value) ?? null)
+            }
+            className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
+          >
+            <option value="">Views…</option>
+            {(views ?? []).map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+          <Button variant="outline" size="sm" className="h-8" onClick={saveCurrentView}>
+            Save view
+          </Button>
+          {activeViewId && (
+            <Button variant="ghost" size="sm" className="h-8" onClick={deleteActiveView}>
+              Delete view
+            </Button>
+          )}
         </div>
       </div>
 

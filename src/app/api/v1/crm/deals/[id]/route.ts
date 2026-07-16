@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withOrgAuth } from "@/lib/api/handler";
+import { runAutomations } from "@/lib/services/crm/automation";
 import { deleteRow, getRow, updateRow } from "@/lib/services/crm/repository";
 import { DEAL_SELECT, getStage, stageSideEffects } from "@/lib/services/crm/deals";
 import { dealInput } from "@/lib/services/crm/types";
@@ -26,6 +27,7 @@ export const PATCH = withOrgAuth(async (req, ctx) => {
   }
 
   const values: Record<string, unknown> = { ...parsed.data };
+  let stageChanged = false;
 
   // A stage move re-derives pipeline_id and the close state from the target
   // stage, so a deal can't land in a stage from another pipeline (or another
@@ -33,6 +35,14 @@ export const PATCH = withOrgAuth(async (req, ctx) => {
   if (parsed.data.stage_id) {
     const stage = await getStage(ctx.supabase, ctx.orgId, parsed.data.stage_id);
     if (!stage) return NextResponse.json({ error: "stage_not_found" }, { status: 422 });
+    const current = (await getRow(
+      ctx.supabase,
+      "crm_deals",
+      ctx.orgId,
+      itemId(req),
+      "id, stage_id",
+    )) as { id: string; stage_id: string } | null;
+    stageChanged = Boolean(current && current.stage_id !== stage.id);
     values.pipeline_id = stage.pipeline_id;
     const effects = stageSideEffects(stage.kind);
     Object.assign(values, effects);
@@ -42,6 +52,13 @@ export const PATCH = withOrgAuth(async (req, ctx) => {
 
   const row = await updateRow(ctx.supabase, "crm_deals", ctx.orgId, itemId(req), values);
   if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  if (stageChanged) {
+    await runAutomations(ctx.supabase, ctx.orgId, ctx.userId, "deal_stage_changed", {
+      entityType: "deal",
+      entityId: itemId(req),
+      stageId: parsed.data.stage_id,
+    });
+  }
   return NextResponse.json({ data: row });
 });
 

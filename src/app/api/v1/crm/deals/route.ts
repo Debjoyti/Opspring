@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withOrgAuth } from "@/lib/api/handler";
+import { runAutomations } from "@/lib/services/crm/automation";
 import { insertRow, listRows } from "@/lib/services/crm/repository";
 import {
   DEAL_SELECT,
@@ -42,5 +43,9 @@ export const POST = withOrgAuth(async (req, ctx) => {
     owner_id: ctx.userId,
   };
   const row = await insertRow(ctx.supabase, "crm_deals", ctx.orgId, values);
+  await runAutomations(ctx.supabase, ctx.orgId, ctx.userId, "deal_created", {
+    entityType: "deal",
+    entityId: (row as { id: string }).id,
+  });
   return NextResponse.json({ data: row }, { status: 201 });
 });

@@ -22,7 +22,10 @@ export type CrmTable =
   | "crm_email_templates"
   | "crm_invoices"
   | "crm_invoice_items"
-  | "crm_payments";
+  | "crm_payments"
+  | "crm_automation_rules"
+  | "crm_automation_runs"
+  | "crm_saved_views";
 
 export async function listRows(
   supabase: SupabaseClient,

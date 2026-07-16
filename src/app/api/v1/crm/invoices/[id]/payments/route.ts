@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withOrgAuth } from "@/lib/api/handler";
+import { runAutomations } from "@/lib/services/crm/automation";
 import { getRow, insertRow } from "@/lib/services/crm/repository";
 import { PAYABLE_STATUSES } from "@/lib/services/crm/invoices";
 import { paymentInput } from "@/lib/services/crm/types";
@@ -62,5 +63,18 @@ export const POST = withOrgAuth(async (req, ctx) => {
     invoice_id: id,
     actor_id: ctx.userId,
   });
+
+  // The DB trigger recomputed the status; fire the automation if this
+  // payment settled the invoice.
+  const after = (await getRow(ctx.supabase, "crm_invoices", ctx.orgId, id, "id, status")) as
+    | { id: string; status: string }
+    | null;
+  if (after?.status === "paid") {
+    await runAutomations(ctx.supabase, ctx.orgId, ctx.userId, "invoice_paid", {
+      entityType: "invoice",
+      entityId: id,
+    });
+  }
+
   return NextResponse.json({ data: row }, { status: 201 });
 });
