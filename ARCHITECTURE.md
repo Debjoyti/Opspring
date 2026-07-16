@@ -67,6 +67,14 @@ Second slice of the CRM, following the exact same patterns (org-scoped RLS, Zod-
 - **Tasks** (`/dashboard/crm/tasks`): activities of type `task` bucketed overdue/today/upcoming/done.
 - Tags are `text[]` columns with GIN indexes on all four entities — deliberately not a join table at this scale.
 
+### Slice 2 (migrations `0009`–`0010`): products, quotes, templates, search
+
+- **Products** (`crm_products`): catalog with SKU (unique per org when set), price, billing interval, active flag. Standard crud-factory routes.
+- **Deal line items** (`crm_deal_items`): a DB trigger (`crm_recalc_deal_amount`) keeps `crm_deals.amount` equal to the item sum whenever a deal has items; deleting the last item returns the deal to manual-amount mode. Managed from the deals board ("Items" on each card).
+- **Quotes** (`crm_quotes` + `crm_quote_items`): per-org sequential numbering via a before-insert trigger under a unique index (clash errors rather than duplicating). Status machine `draft→sent→accepted|declined|expired` (expired→sent for re-sends) enforced server-side in `/quotes/[id]/status`, stamping `sent_at`/`accepted_at`/`declined_at`. Quote math lives in `src/lib/services/crm/quotes.ts` (pure, tested) and is shared by API, builder UI, and the print view. Creating a quote from a deal inherits account/contact/currency and copies the deal's line items. Printable view at `/print/quotes/[id]` (server-rendered under RLS; browser print → PDF).
+- **Email templates** (`crm_email_templates`): `{{merge_field}}` rendering in `templates.ts` (pure, tested), preview against any lead/contact, copy or `mailto:` handoff. Actual SMTP/Gmail *sending* is deliberately not faked — it needs a real mail integration (OAuth credentials) first.
+- **Global search**: `GET /api/v1/crm/search?q=` ILIKE across leads/contacts/accounts/deals/products/quotes, backed by `pg_trgm` GIN indexes (extension moved to the `extensions` schema in `0010` per the Supabase linter). Ctrl/Cmd-K dialog in the dashboard header.
+
 ## Known limitations / fast-follows
 
 - **No local Supabase CLI/Docker stack.** This environment has no Docker, so RLS was verified directly against the live project using `SET ROLE authenticated; SET request.jwt.claims = '...'` (see `scripts/verify-rls.sql`) rather than an automated integration test against a local stack. Wire up `supabase` CLI + Docker and turn that script into a CI check once available.

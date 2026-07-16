@@ -14,7 +14,12 @@ export type CrmTable =
   | "crm_activities"
   | "crm_pipelines"
   | "crm_pipeline_stages"
-  | "crm_notes";
+  | "crm_notes"
+  | "crm_products"
+  | "crm_deal_items"
+  | "crm_quotes"
+  | "crm_quote_items"
+  | "crm_email_templates";
 
 export async function listRows(
   supabase: SupabaseClient,

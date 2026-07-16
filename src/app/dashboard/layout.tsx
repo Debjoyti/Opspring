@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { GlobalSearch } from "@/components/dashboard/global-search";
 import { getDashboardSession } from "@/lib/dashboard/session";
 import { signOut } from "../(auth)/actions";
 
@@ -19,6 +21,9 @@ export default async function DashboardLayout({
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b px-6 py-3">
           <div className="text-sm text-muted-foreground">{user.email}</div>
+          <Suspense>
+            <GlobalSearch organizations={organizations} />
+          </Suspense>
           <form action={signOut}>
             <Button type="submit" variant="ghost" size="sm">
               Sign out

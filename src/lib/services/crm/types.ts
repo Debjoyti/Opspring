@@ -145,6 +145,82 @@ export const scoreLeadsInput = z.object({
   ids: z.array(z.string().uuid()).max(25).optional(),
 });
 
+// Products / line items ----------------------------------------------------------
+
+export const BILLING_INTERVALS = ["one_time", "monthly", "yearly"] as const;
+export type BillingInterval = (typeof BILLING_INTERVALS)[number];
+
+export const productInput = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200),
+  sku: optionalText,
+  description: z.string().trim().max(2000).optional().or(z.literal("").transform(() => undefined)),
+  unit_price: z.coerce.number().min(0).default(0),
+  // An empty string falls through to the column default ('USD').
+  currency: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .length(3)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  billing_interval: z.enum(BILLING_INTERVALS).default("one_time"),
+  active: z.boolean().default(true),
+  tags: tagsInput,
+});
+export type ProductInput = z.infer<typeof productInput>;
+
+export const lineItemInput = z.object({
+  product_id: optionalUuid,
+  description: z.string().trim().min(1, "Description is required").max(300),
+  quantity: z.coerce.number().positive().default(1),
+  unit_price: z.coerce.number().min(0).default(0),
+  discount_pct: z.coerce.number().min(0).max(100).default(0),
+  position: z.coerce.number().int().min(0).default(0),
+});
+export type LineItemInput = z.infer<typeof lineItemInput>;
+
+// Quotes --------------------------------------------------------------------------
+
+export const QUOTE_STATUSES = ["draft", "sent", "accepted", "declined", "expired"] as const;
+export type QuoteStatus = (typeof QUOTE_STATUSES)[number];
+
+export const quoteInput = z.object({
+  title: z.string().trim().min(1, "Title is required").max(200),
+  deal_id: optionalUuid,
+  account_id: optionalUuid,
+  contact_id: optionalUuid,
+  currency: z.string().trim().length(3).default("USD"),
+  discount_pct: z.coerce.number().min(0).max(100).default(0),
+  tax_rate: z.coerce.number().min(0).max(100).default(0),
+  valid_until: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  notes: z.string().trim().max(2000).optional().or(z.literal("").transform(() => undefined)),
+  terms: z.string().trim().max(2000).optional().or(z.literal("").transform(() => undefined)),
+  items: z.array(lineItemInput).max(50).optional(),
+});
+export type QuoteInput = z.infer<typeof quoteInput>;
+
+export const quotePatchInput = quoteInput.omit({ items: true }).partial();
+
+export const quoteStatusInput = z.object({ status: z.enum(QUOTE_STATUSES) });
+
+// Email templates -------------------------------------------------------------------
+
+export const templateInput = z.object({
+  name: z.string().trim().min(1, "Name is required").max(120),
+  subject: z.string().trim().min(1, "Subject is required").max(200),
+  body: z.string().trim().min(1, "Body is required").max(10000),
+});
+export type TemplateInput = z.infer<typeof templateInput>;
+
+export const templateRenderInput = z.object({
+  entity_type: z.enum(["lead", "contact"]),
+  entity_id: z.string().uuid(),
+});
+
 // Duplicates / merge -------------------------------------------------------------
 
 export const DUPLICATE_RESOURCES = ["leads", "contacts", "accounts"] as const;

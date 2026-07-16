@@ -23,6 +23,7 @@ import {
   type PipelineStage,
 } from "@/lib/crm/client";
 import { RecordTimeline } from "@/components/crm/record-timeline";
+import { DealItemsDialog } from "@/components/crm/deal-items-dialog";
 import { formatCurrency } from "@/lib/format";
 
 type Deal = {
@@ -50,6 +51,7 @@ export function DealsClient({ orgId }: { orgId: string }) {
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [timelineDeal, setTimelineDeal] = useState<Deal | null>(null);
+  const [itemsDeal, setItemsDeal] = useState<Deal | null>(null);
   const [lostPrompt, setLostPrompt] = useState<{ deal: Deal; stage: PipelineStage } | null>(null);
   const [lostReason, setLostReason] = useState("");
 
@@ -168,6 +170,15 @@ export function DealsClient({ orgId }: { orgId: string }) {
                       <div className="mt-1 text-xs text-destructive">{deal.lost_reason}</div>
                     )}
                     <div className="mt-2 flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        title="Line items"
+                        onClick={() => setItemsDeal(deal)}
+                      >
+                        Items
+                      </Button>
                       <select
                         value={deal.stage_id}
                         onChange={(e) => {
@@ -296,6 +307,14 @@ export function DealsClient({ orgId }: { orgId: string }) {
         entityId={timelineDeal?.id ?? null}
         title={timelineDeal?.name ?? "Deal"}
         onClose={() => setTimelineDeal(null)}
+      />
+
+      <DealItemsDialog
+        orgId={orgId}
+        dealId={itemsDeal?.id ?? null}
+        dealName={itemsDeal?.name ?? "Deal"}
+        currency={itemsDeal?.currency ?? "USD"}
+        onClose={() => setItemsDeal(null)}
       />
     </div>
   );

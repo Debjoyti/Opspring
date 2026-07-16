@@ -159,13 +159,21 @@ async function seedCrm(orgId, ownerId) {
     deal("Initech - Legacy renewal", initech, 8000, "Lost"),
   ]);
 
+  await admin.from("crm_products").insert([
+    { org_id: orgId, name: "Platform License", sku: "PLT-100", unit_price: 1200, billing_interval: "monthly", owner_id: ownerId },
+    { org_id: orgId, name: "Onboarding Package", sku: "SVC-ONB", unit_price: 5000, billing_interval: "one_time", owner_id: ownerId },
+    { org_id: orgId, name: "Premium Support", sku: "SUP-PREM", unit_price: 300, billing_interval: "monthly", owner_id: ownerId },
+  ]);
+
   await admin.from("crm_activities").insert([
     { org_id: orgId, type: "call", subject: "Discovery call with Globex", notes: "Discussed licensing tiers and timeline.", related_type: "account", related_id: globex, actor_id: ownerId, done: true },
     { org_id: orgId, type: "email", subject: "Sent proposal to Initech", notes: "Proposal PDF for pilot rollout.", related_type: "account", related_id: initech, actor_id: ownerId, done: true },
     { org_id: orgId, type: "meeting", subject: "Umbrella migration scoping", notes: "Reviewed data volumes and cutover plan.", related_type: "account", related_id: umbrella, actor_id: ownerId, done: false },
   ]);
 
-  console.log("\nSeeded CRM demo data: 3 accounts, 3 contacts, 4 leads, 5 deals, 3 activities.");
+  console.log(
+    "\nSeeded CRM demo data: 3 accounts, 3 contacts, 4 leads, 5 deals, 3 products, 3 activities.",
+  );
 }
 
 async function main() {

@@ -13,7 +13,10 @@ export type CrmResource =
   | "leads"
   | "deals"
   | "activities"
-  | "notes";
+  | "notes"
+  | "products"
+  | "quotes"
+  | "templates";
 
 async function api<T>(
   path: string,
