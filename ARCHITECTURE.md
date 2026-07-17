@@ -91,6 +91,17 @@ Second slice of the CRM, following the exact same patterns (org-scoped RLS, Zod-
 - New automation action `enroll_in_cadence` (lead_created only), so "lead created → auto-enroll in the intro cadence" is a two-click rule.
 - UI: Cadences screen (builder, pause/activate, enrollments dialog with unenroll), an "Enroll" action on lead rows, and the cadence picker inside the automation rule builder.
 
+## Clinic / practice-management module
+
+A second real vertical (alongside the sales CRM), modeled on the Practo export from The Healing Clinic — a wellness/pain clinic. Proves the platform isn't CRM-only: the same foundation (orgs, memberships, real RLS) carries a completely different domain.
+
+- **Schema** (`0015_clinic_module.sql`): `clinic_patients`, `clinic_procedures`, `clinic_appointments`, `clinic_treatments`, `clinic_payments`, `clinic_invoices`, `clinic_clinical_notes`. Every table `org_id`-scoped with the same real-RLS policy pattern, plus grant hygiene. Child tables keep both a `patient_id` FK and the source `patient_number` (so an import can link even before the FK is resolved).
+- **Importer** (`scripts/import-practo.mjs`, `npm run import:practo`): maps the 10 Practo CSVs into the clinic tables for a target org, patients first (to build `patient_number → id`), then batched inserts. Reads CSVs from a local `PRACTO_DIR` — **patient PII is never committed to the repo**. Handles Practo's single-quote-wrapped values and INR amounts.
+- **API** (`/api/v1/clinic/*`): read-oriented list endpoints via a `clinicList` factory (supports `?q=` ILIKE search across configured columns, `?limit/offset`, capped) plus a patient-detail route (patient + their appointments/treatments/payments/notes) and an overview aggregate. All guarded by `withOrgAuth`; `check-route-guards.mjs` recognizes `clinicList` as a guard.
+- **Metrics** (`src/lib/services/clinic/metrics.ts`): overview uses `head:true` counts so it never pulls the 13k appointment / 6k payment rows into memory; money/mode/procedure rollups pull only the needed columns.
+- **UI** (`src/app/dashboard/clinic/*`): a clinic overview (collected revenue, patients, appointments today/upcoming, top procedures, payment modes, recent payments), a searchable Patients list with a full patient-history drawer, and Appointments / Procedures / Billing screens. The sidebar is now grouped into sections (Clinic / CRM / Workspace).
+- **Scope note**: this is a practice-management module (patients, visits, billing), deliberately distinct from the sales CRM (leads → deals). They share the dashboard shell and foundation but not tables.
+
 ## Known limitations / fast-follows
 
 - **No local Supabase CLI/Docker stack.** This environment has no Docker, so RLS was verified directly against the live project using `SET ROLE authenticated; SET request.jwt.claims = '...'` (see `scripts/verify-rls.sql`) rather than an automated integration test against a local stack. Wire up `supabase` CLI + Docker and turn that script into a CI check once available.

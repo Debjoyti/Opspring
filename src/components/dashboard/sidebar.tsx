@@ -21,31 +21,60 @@ import {
   Sparkles,
   Users,
   ChevronDown,
+  Stethoscope,
+  CalendarDays,
+  ClipboardList,
+  IndianRupee,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 type Org = { id: string; name: string; slug: string };
 
-const NAV = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/crm", label: "CRM Overview", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/crm/leads", label: "Leads", icon: Target },
-  { href: "/dashboard/crm/deals", label: "Deals", icon: Handshake },
-  { href: "/dashboard/crm/accounts", label: "Accounts", icon: Building2 },
-  { href: "/dashboard/crm/contacts", label: "Contacts", icon: Contact },
-  { href: "/dashboard/crm/activities", label: "Activities", icon: ListChecks },
-  { href: "/dashboard/crm/tasks", label: "Tasks", icon: CheckSquare },
-  { href: "/dashboard/crm/products", label: "Products", icon: Package },
-  { href: "/dashboard/crm/quotes", label: "Quotes", icon: FileText },
-  { href: "/dashboard/crm/invoices", label: "Invoices", icon: Receipt },
-  { href: "/dashboard/crm/templates", label: "Email Templates", icon: Mail },
-  { href: "/dashboard/crm/cadences", label: "Cadences", icon: Repeat },
-  { href: "/dashboard/crm/automations", label: "Automations", icon: Zap },
-  { href: "/dashboard/crm/reports", label: "Reports", icon: BarChart3 },
-  { href: "/dashboard/crm/settings", label: "Pipeline Settings", icon: Settings2 },
-  { href: "/dashboard/assistant", label: "AI Assistant", icon: Sparkles },
-  { href: "/dashboard/members", label: "Members", icon: Users },
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
+
+const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
+  {
+    title: "",
+    items: [{ href: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true }],
+  },
+  {
+    title: "Clinic",
+    items: [
+      { href: "/dashboard/clinic", label: "Clinic Overview", icon: Stethoscope, exact: true },
+      { href: "/dashboard/clinic/patients", label: "Patients", icon: Users },
+      { href: "/dashboard/clinic/appointments", label: "Appointments", icon: CalendarDays },
+      { href: "/dashboard/clinic/procedures", label: "Procedures", icon: ClipboardList },
+      { href: "/dashboard/clinic/billing", label: "Billing", icon: IndianRupee },
+    ],
+  },
+  {
+    title: "CRM",
+    items: [
+      { href: "/dashboard/crm", label: "CRM Overview", icon: LayoutDashboard, exact: true },
+      { href: "/dashboard/crm/leads", label: "Leads", icon: Target },
+      { href: "/dashboard/crm/deals", label: "Deals", icon: Handshake },
+      { href: "/dashboard/crm/accounts", label: "Accounts", icon: Building2 },
+      { href: "/dashboard/crm/contacts", label: "Contacts", icon: Contact },
+      { href: "/dashboard/crm/activities", label: "Activities", icon: ListChecks },
+      { href: "/dashboard/crm/tasks", label: "Tasks", icon: CheckSquare },
+      { href: "/dashboard/crm/products", label: "Products", icon: Package },
+      { href: "/dashboard/crm/quotes", label: "Quotes", icon: FileText },
+      { href: "/dashboard/crm/invoices", label: "Invoices", icon: Receipt },
+      { href: "/dashboard/crm/templates", label: "Email Templates", icon: Mail },
+      { href: "/dashboard/crm/cadences", label: "Cadences", icon: Repeat },
+      { href: "/dashboard/crm/automations", label: "Automations", icon: Zap },
+      { href: "/dashboard/crm/reports", label: "Reports", icon: BarChart3 },
+      { href: "/dashboard/crm/settings", label: "Pipeline Settings", icon: Settings2 },
+    ],
+  },
+  {
+    title: "Workspace",
+    items: [
+      { href: "/dashboard/assistant", label: "AI Assistant", icon: Sparkles },
+      { href: "/dashboard/members", label: "Members", icon: Users },
+    ],
+  },
 ];
 
 export function Sidebar({
@@ -110,26 +139,35 @@ export function Sidebar({
         )}
       </div>
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
-        {NAV.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href, item.exact);
-          return (
-            <Link
-              key={item.href}
-              href={withOrg(item.href)}
-              className={cn(
-                "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
-                active
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
-              )}
-            >
-              <Icon className="size-4 shrink-0" />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 space-y-3 overflow-y-auto p-2">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.title || "root"} className="space-y-0.5">
+            {section.title && (
+              <div className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+                {section.title}
+              </div>
+            )}
+            {section.items.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href, item.exact);
+              return (
+                <Link
+                  key={item.href}
+                  href={withOrg(item.href)}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  )}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
     </aside>
   );

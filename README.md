@@ -25,6 +25,17 @@ npm run seed   # create a demo org with a member per role (needs SUPABASE_SERVIC
 
 `npm run seed` creates "Acme Demo Co" with one confirmed, ready-to-log-in user per role (`owner@acme-demo.test` through `guest@acme-demo.test`, password `DemoPassword123!`). It uses the Auth Admin API to create users — never raw SQL against `auth.users` — and is idempotent, so re-running it just reconciles roles instead of duplicating anything. See `scripts/seed.mjs`.
 
+## Importing a Practo clinic export
+
+The Clinic module (`/dashboard/clinic`) can be loaded from a Practo export (the 10 CSVs). The importer reads the CSVs from a local folder you point it at — **patient PII is never committed to this repo**:
+
+```bash
+PRACTO_DIR="C:/path/to/PractoExport" CLINIC_ORG_ID="<org-uuid>" npm run import:practo
+# add RESET=1 to clear that org's existing clinic data first
+```
+
+It loads patients, procedures, appointments, treatments, payments, invoices, and clinical notes into the `clinic_*` tables for that org (needs `SUPABASE_SERVICE_ROLE_KEY`). See `scripts/import-practo.mjs`.
+
 ## Database migrations
 
 SQL migrations live in `supabase/migrations/`, applied to the live project via the Supabase MCP. There is no local Supabase CLI/Docker stack wired up yet — see ARCHITECTURE.md for what that means for RLS testing.
