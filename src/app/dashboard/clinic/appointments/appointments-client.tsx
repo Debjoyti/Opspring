@@ -45,6 +45,7 @@ export function AppointmentsClient({ orgId }: { orgId: string }) {
       orgId={orgId}
       resource="appointments"
       title="Appointments"
+      hideTitle
       columns={columns}
       searchPlaceholder="Search by patient, practitioner, status…"
     />

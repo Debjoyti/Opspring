@@ -22,6 +22,7 @@ export function ClinicTable<T extends { id: string }>({
   searchable = true,
   searchPlaceholder,
   limit = 100,
+  hideTitle = false,
 }: {
   orgId: string;
   resource: ClinicResource;
@@ -30,6 +31,8 @@ export function ClinicTable<T extends { id: string }>({
   searchable?: boolean;
   searchPlaceholder?: string;
   limit?: number;
+  // For pages that render their own heading (e.g. the appointments view toggle).
+  hideTitle?: boolean;
 }) {
   const [q, setQ] = useState("");
   const { data, isLoading } = useClinicList<T>(resource, orgId, { q, limit });
@@ -38,8 +41,8 @@ export function ClinicTable<T extends { id: string }>({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">{title}</h1>
-        <span className="text-sm text-muted-foreground">
+        {!hideTitle && <h1 className="text-2xl font-semibold">{title}</h1>}
+        <span className="ml-auto text-sm text-muted-foreground">
           {data ? `${data.total.toLocaleString("en-IN")} total` : ""}
         </span>
       </div>

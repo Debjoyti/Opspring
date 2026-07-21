@@ -45,6 +45,32 @@ export function useClinicPatient(orgId: string, patientId: string | null) {
   });
 }
 
+export type CalendarAppointment = {
+  id: string;
+  patient_id: string | null;
+  patient_name: string | null;
+  patient_number: string | null;
+  appointment_at: string | null;
+  doctor: string | null;
+  status: string | null;
+  notes: string | null;
+  checked_in_at: string | null;
+  checked_out_at: string | null;
+};
+
+/** Appointments in [from, to) — ISO date strings — for the calendar grid. */
+export function useClinicCalendar(orgId: string, from: string, to: string) {
+  return useQuery({
+    queryKey: ["clinic", "calendar", orgId, from, to],
+    queryFn: () =>
+      api<{ data: CalendarAppointment[] }>(
+        `appointments/calendar?from=${from}&to=${to}`,
+        orgId,
+      ).then((r) => r.data),
+    placeholderData: keepPreviousData,
+  });
+}
+
 export type PatientDetail = {
   patient: Record<string, unknown> & { id: string; name: string; patient_number: string };
   appointments: { id: string; appointment_at: string | null; doctor: string | null; status: string | null }[];
