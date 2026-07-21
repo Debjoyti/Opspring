@@ -71,6 +71,39 @@ export function useClinicCalendar(orgId: string, from: string, to: string) {
   });
 }
 
+export type ClinicAnalyticsData = {
+  range: { fromMonth: string; toMonth: string; months: number };
+  kpis: {
+    totalCollected: number;
+    payments: number;
+    avgTicket: number;
+    activePatients: number;
+    revenuePerPatient: number;
+    appointments: number;
+    cancellationRate: number;
+  };
+  revenueByMonth: { label: string; value: number }[];
+  appointmentsByDay: { label: string; value: number }[];
+  topProceduresByRevenue: { name: string; revenue: number; count: number }[];
+  practitionerLoad: { doctor: string; appointments: number; share: number }[];
+  paymentModeMix: { mode: string; amount: number; share: number }[];
+  forecast: {
+    revenue: { predictions: number[]; direction: "up" | "down" | "flat"; nextChangePct: number | null; fit: { r2: number } };
+    horizonLabels: string[];
+  };
+  anomalies: { label: string; value: number; z: number }[];
+  insights: { kind: "positive" | "warning" | "neutral"; title: string; detail: string }[];
+  narrative: { available: boolean; text: string | null };
+};
+
+export function useClinicAnalytics(orgId: string) {
+  return useQuery({
+    queryKey: ["clinic", "analytics", orgId],
+    queryFn: () => api<{ data: ClinicAnalyticsData }>("analytics", orgId).then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+
 export type PatientDetail = {
   patient: Record<string, unknown> & { id: string; name: string; patient_number: string };
   appointments: { id: string; appointment_at: string | null; doctor: string | null; status: string | null }[];

@@ -42,6 +42,7 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
     title: "Clinic",
     items: [
       { href: "/dashboard/clinic", label: "Clinic Overview", icon: Stethoscope, exact: true },
+      { href: "/dashboard/clinic/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/dashboard/clinic/patients", label: "Patients", icon: Users },
       { href: "/dashboard/clinic/appointments", label: "Appointments", icon: CalendarDays },
       { href: "/dashboard/clinic/procedures", label: "Procedures", icon: ClipboardList },
